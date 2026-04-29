@@ -9,12 +9,13 @@ import java.util.Map;
 import static io.restassured.RestAssured.given;
 
 public class JobAPI {
-    public static Response submitJob(String jobName, Map<String, Object> optionalParams) {
+    public static Response submitJob(String baseUri, String jobName, Map<String, Object> optionalParams) {
         return given()
+                .baseUri(baseUri)
                 .contentType("application/json")
                 .pathParam("jobName", jobName)
                 .queryParams(optionalParams != null ? optionalParams : new HashMap<>())
-                .post("/server-app/testing-integration-app/mozart/jobs/submit/{jobname}")
+                .post("/server-app/testing-integration-app/mozart/jobs/submit/{jobName}")
                 .extract()
                 .response();
     }

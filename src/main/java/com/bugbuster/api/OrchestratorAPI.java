@@ -8,9 +8,8 @@ import static io.restassured.RestAssured.given;
 public class OrchestratorAPI {
 
     public static Response startOrchestrator(String baseUri) {
-        RestAssured.baseURI =baseUri;
-        RestAssured.port = 8080;
         return given()
+                .baseUri(baseUri)
                 .contentType("application/json")
                 .post("/server-app/testing-integration-app/mozart/orchestrator/initialize");
     }

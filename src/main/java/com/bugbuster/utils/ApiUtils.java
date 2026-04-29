@@ -9,7 +9,7 @@ import java.util.Map;
 
 public class ApiUtils {
 
-    public static Boolean waitForJobCompletion(String jobId, int maxRetries, int intervalMs) throws InterruptedExce, InterruptedException {
+    public static Boolean waitForJobCompletion(String jobId, int maxRetries, int intervalMs) throws InterruptedException {
         for (int i = 0; i < maxRetries; i++) {
             Response response = JobAPI.getJobInfo(jobId);
 
@@ -28,12 +28,13 @@ public class ApiUtils {
             }
             Thread.sleep(intervalMs);
         }
+        throw new RuntimeException("Job "+ jobId + " did not complete successfully within the expected time.");
     }
 
-    public static List<String> submitJobs(int count, String jobName, Map<String,Object> optionalParams) {
+    public static List<String> submitJobs(String baseUri, int count, String jobName, Map<String,Object> optionalParams) {
         List<String> jobIds = new ArrayList<>();
         for(int i = 0;i< count; i++){
-            Response res = JobAPI.submitJob(jobName, optionalParams);
+            Response res = JobAPI.submitJob(baseUri,jobName, optionalParams);
             System.out.println("SubmittingJob raw response: "+ res.asString());
             if(res.statusCode() != 200){
                 throw new RuntimeException("Failed to submit job. HTTP status: "+ res.statusCode());
