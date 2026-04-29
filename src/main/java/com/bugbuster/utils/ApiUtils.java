@@ -6,6 +6,7 @@ import io.restassured.response.Response;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class ApiUtils {
 
@@ -24,6 +25,28 @@ public class ApiUtils {
             System.out.println("Job " + jobId + " state: " + jobState);
             if ("SUCCESSFUL".equalsIgnoreCase(jobState)) {
                 System.out.println("Job " + jobId + " completed successfully.");
+                return true;
+            }
+            Thread.sleep(intervalMs);
+        }
+        throw new RuntimeException("Job " + jobId + " did not complete successfully within the expected time.");
+    }
+
+    public static Boolean waitForJobFailure(String baseUri, String jobId, int maxRetries, int intervalMs) throws InterruptedException {
+        for (int i = 0; i < maxRetries; i++) {
+            Response response = JobAPI.getJobInfo(baseUri, jobId);
+
+            System.out.println("Raw response for job " + jobId + ":");
+            System.out.println(response.asString());
+            // Ensure server returned 200 before parsing JSON
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("Failed to fetch job status. HTTP status: " + response.statusCode());
+            }
+
+            String jobState = response.jsonPath().getString("jobstate");
+            System.out.println("Job " + jobId + " state: " + jobState);
+            if ("FAILED".equalsIgnoreCase(jobState)) {
+                System.out.println("Job " + jobId + " Job failed successfully.");
                 return true;
             }
             Thread.sleep(intervalMs);
@@ -79,5 +102,9 @@ public class ApiUtils {
     public static String getJobState(String baseUri, String jobId) {
         Response response = JobAPI.getJobInfo(baseUri, jobId);
         return response.jsonPath().getString("jobState");
+    }
+
+    public static Boolean validateJobState(String baseUri, String expectedJobState, String jobId){
+        return Objects.equals(getJobState(baseUri,jobId), expectedJobState);
     }
 }

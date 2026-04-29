@@ -10,6 +10,7 @@ import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.dsl.RollableScalableResource;
 import org.junit.jupiter.api.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,9 +93,9 @@ public class MozartApiK8sDynamicTests {
         assertEquals(10,jobIds.size());
 
         for (String jobId:jobIds){
-            assertTrue(ApiUtils.waitForJobCompletion(jobId, 10, 500));
+            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 10, 500));
         }
-        JobUtils.validateSequentialJobs(jobIds);
+        JobUtils.validateSequentialJobs(baseUri1, jobIds);
     }
 
     //Bucketing Queue Tests
@@ -147,7 +148,7 @@ public class MozartApiK8sDynamicTests {
         // Verify job completes successfully
         assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobIds.get(0), 10, 1000),
                 "Job in bucketA did not complete");
-        ApiUtils.validateState(baseUri1, jobIds.get(0), "SUCCESSFUL");
+        ApiUtils.validateJobState(baseUri1, jobIds.get(0), "SUCCESSFUL");
     }
 
 
@@ -180,7 +181,7 @@ public class MozartApiK8sDynamicTests {
         for (String jobId : jobIds) {
             assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 15, 1000),
                     "Job " + jobId + " in bucketA did not complete");
-            ApiUtils.validateState(baseUri1, jobId, "SUCCESSFUL");
+            ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
         System.out.println("All 5 jobs in bucketA completed successfully");
     }
@@ -229,7 +230,7 @@ public class MozartApiK8sDynamicTests {
         for (String jobId : allJobIds) {
             assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 15, 1000),
                     "Job " + jobId + " did not complete");
-            ApiUtils.validateState(baseUri1, jobId, "SUCCESSFUL");
+            ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
         System.out.println("All jobs across bucketA, bucketB, bucketC completed successfully");
     }
@@ -365,7 +366,7 @@ public class MozartApiK8sDynamicTests {
         for (String jobId : jobIds) {
             assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 30, 1000),
                     "Job " + jobId + " did not complete");
-            ApiUtils.validateState(baseUri1, jobId, "SUCCESSFUL");
+            ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
         System.out.println("All 50 jobs in bucketA completed successfully");
     }
@@ -412,7 +413,7 @@ public class MozartApiK8sDynamicTests {
         for (String jobId : allJobIds) {
             assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 60, 1000),
                     "Job " + jobId + " did not complete");
-            ApiUtils.validateState(baseUri1, jobId, "SUCCESSFUL");
+            ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
         System.out.println("All " + allJobIds.size() + " jobs across " + bucketCount + " buckets completed successfully");
     }
