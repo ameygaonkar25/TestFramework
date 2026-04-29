@@ -17,4 +17,16 @@ public class ExecutorAPI {
                 .queryParams(queryParams != null ? queryParams : new HashMap<>())
                 .post("/server-app/testing-integration-app/mozart/job-executor/initialize");
     }
+
+    public Response destroyExecutor() {
+        return given()
+                .contentType("application/json")
+                .post("/server-app/testing-integration-app/mozart/job-executor/destroy");
+    }
+
+    public Response unblockExecutor() {
+        return given()
+                .contentType("application/json")
+                .post("/server-app/testing-integration-app/mozart/job-executor/unblock");
+    }
 }

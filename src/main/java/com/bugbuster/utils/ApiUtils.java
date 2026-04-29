@@ -9,9 +9,9 @@ import java.util.Map;
 
 public class ApiUtils {
 
-    public static Boolean waitForJobCompletion(String jobId, int maxRetries, int intervalMs) throws InterruptedException {
+    public static Boolean waitForJobCompletion(String baseUri, String jobId, int maxRetries, int intervalMs) throws InterruptedException {
         for (int i = 0; i < maxRetries; i++) {
-            Response response = JobAPI.getJobInfo(jobId);
+            Response response = JobAPI.getJobInfo(baseUri, jobId);
 
             System.out.println("Raw response for job " + jobId + ":");
             System.out.println(response.asString());
@@ -28,23 +28,56 @@ public class ApiUtils {
             }
             Thread.sleep(intervalMs);
         }
-        throw new RuntimeException("Job "+ jobId + " did not complete successfully within the expected time.");
+        throw new RuntimeException("Job " + jobId + " did not complete successfully within the expected time.");
     }
 
-    public static List<String> submitJobs(String baseUri, int count, String jobName, Map<String,Object> optionalParams) {
+    public static List<String> submitJobs(String baseUri, int count, String jobName, Map<String, Object> optionalParams) {
         List<String> jobIds = new ArrayList<>();
-        for(int i = 0;i< count; i++){
-            Response res = JobAPI.submitJob(baseUri,jobName, optionalParams);
-            System.out.println("SubmittingJob raw response: "+ res.asString());
-            if(res.statusCode() != 200){
-                throw new RuntimeException("Failed to submit job. HTTP status: "+ res.statusCode());
+        for (int i = 0; i < count; i++) {
+            Response res = JobAPI.submitJob(baseUri, jobName, optionalParams);
+            System.out.println("SubmittingJob raw response: " + res.asString());
+            if (res.statusCode() != 200) {
+                throw new RuntimeException("Failed to submit job. HTTP status: " + res.statusCode());
             }
             String jobId = res.asString();
-            if(jobId ==null || jobId.isEmpty()){
-                throw new RuntimeException("jobId is null/Empty for job: "+ jobName);
+            if (jobId == null || jobId.isEmpty()) {
+                throw new RuntimeException("jobId is null/Empty for job: " + jobName);
             }
             jobIds.add(jobId.trim());
         }
         return jobIds;
+    }
+
+    public static List<String> submitTimeConsumingJobs(String baseUri, int count, String priority) {
+        List<String> jobIds = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            Response res = JobAPI.submitTimeConsumingJob(baseUri, priority);
+            System.out.println("SubmittingJob raw response: " + res.asString());
+            if (res.statusCode() != 200) {
+                throw new RuntimeException("Failed to submit job. HTTP status: " + res.statusCode());
+            }
+            String jobId = res.asString();
+            if (jobId == null || jobId.isEmpty()) {
+                throw new RuntimeException("jobId is null/Empty for job: ");
+            }
+            jobIds.add(jobId.trim());
+        }
+        return jobIds;
+    }
+
+    public static int countJobsByStatus(String baseUri, List<String> jobIds, String status) {
+        int count = 0;
+        for (String jobId : jobIds) {
+            Response res = JobAPI.getJobInfo(baseUri, jobId);
+            if (status.equalsIgnoreCase(res.jsonPath().getString("jobState"))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public static String getJobState(String baseUri, String jobId) {
+        Response response = JobAPI.getJobInfo(baseUri, jobId);
+        return response.jsonPath().getString("jobState");
     }
 }

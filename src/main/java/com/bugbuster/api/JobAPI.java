@@ -16,12 +16,32 @@ public class JobAPI {
                 .pathParam("jobName", jobName)
                 .queryParams(optionalParams != null ? optionalParams : new HashMap<>())
                 .post("/server-app/testing-integration-app/mozart/jobs/submit/{jobName}")
+                .then()
                 .extract()
                 .response();
     }
 
-    public static Response getJobInfo(String jobId){
+    public static Response submitTimeConsumingJob(String baseUri, String priority) {
         return given()
+                .baseUri(baseUri)
+                .contentType("application/json")
+                .post("/server-app/testing-integration-app/mozart/jobs/submitTimeConsumingJob")
+                .then()
+                .extract()
+                .response();
+    }
+
+    public static void setTimeTakenByJobs(String baseUri, int jobTime) {
+        given()
+                .baseUri(baseUri)
+                .pathParam("jobTime", jobTime)
+                .contentType("application/json")
+                .get("/server-app/testing-integration-app/mozart/jobs/setTimeTakenByJobInMillis?timeTakenInMillis={jobTime}");
+    }
+
+    public static Response getJobInfo(String baseUri, String jobId){
+        return given()
+                .baseUri(baseUri)
                 .pathParam("jobId", jobId)
                 .get("/server-app/testing-integration-app/mozart/jobs/jobInfo/{jobId}")
                 .then()
