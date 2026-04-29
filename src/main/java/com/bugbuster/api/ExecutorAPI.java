@@ -18,14 +18,15 @@ public class ExecutorAPI {
                 .post("/server-app/testing-integration-app/mozart/job-executor/initialize");
     }
 
-    public Response destroyExecutor() {
+    public static Response destroyExecutor() {
         return given()
                 .contentType("application/json")
                 .post("/server-app/testing-integration-app/mozart/job-executor/destroy");
     }
 
-    public Response unblockExecutor() {
+    public static Response unblockExecutor(String baseUri) {
         return given()
+                .baseUri(baseUri)
                 .contentType("application/json")
                 .post("/server-app/testing-integration-app/mozart/job-executor/unblock");
     }

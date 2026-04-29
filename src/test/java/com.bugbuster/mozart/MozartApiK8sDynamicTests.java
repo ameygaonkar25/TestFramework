@@ -93,7 +93,7 @@ public class MozartApiK8sDynamicTests {
         assertEquals(10,jobIds.size());
 
         for (String jobId:jobIds){
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 10, 500));
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 10, 500));
         }
         JobUtils.validateSequentialJobs(baseUri1, jobIds);
     }
@@ -146,7 +146,7 @@ public class MozartApiK8sDynamicTests {
         System.out.println("Job submitted to new bucket 'bucketA': " + jobIds.get(0));
 
         // Verify job completes successfully
-        assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobIds.get(0), 10, 1000),
+        assertTrue(ApiUtils.waitForJobState(baseUri1, jobIds.get(0), "SUCCESSFUL", 10, 1000),
                 "Job in bucketA did not complete");
         ApiUtils.validateJobState(baseUri1, jobIds.get(0), "SUCCESSFUL");
     }
@@ -179,7 +179,7 @@ public class MozartApiK8sDynamicTests {
 
         // All jobs should complete successfully
         for (String jobId : jobIds) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 15, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 15, 1000),
                     "Job " + jobId + " in bucketA did not complete");
             ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
@@ -228,7 +228,7 @@ public class MozartApiK8sDynamicTests {
         allJobIds.addAll(jobIdsC);
 
         for (String jobId : allJobIds) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 15, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 10, 1000),
                     "Job " + jobId + " did not complete");
             ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
@@ -268,11 +268,11 @@ public class MozartApiK8sDynamicTests {
 
         // Wait for all jobs to complete before validating order
         for (String jobId : jobIdsA) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 20, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 20, 1000),
                     "Job " + jobId + " in bucketA did not complete");
         }
         for (String jobId : jobIdsB) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 20, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 20, 1000),
                     "Job " + jobId + " in bucketB did not complete");
         }
 
@@ -318,15 +318,15 @@ public class MozartApiK8sDynamicTests {
 
         // Wait for all jobs to complete before validating order
         for (String jobId : jobIdsA) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 30, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 30, 1000),
                     "Job " + jobId + " in bucketA did not complete");
         }
         for (String jobId : jobIdsB) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 30, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 30, 1000),
                     "Job " + jobId + " in bucketB did not complete");
         }
         for (String jobId : jobIdsC) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 30, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 30, 1000),
                     "Job " + jobId + " in bucketC did not complete");
         }
 
@@ -364,7 +364,7 @@ public class MozartApiK8sDynamicTests {
 
         // All 50 should complete successfully
         for (String jobId : jobIds) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 30, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 30, 1000),
                     "Job " + jobId + " did not complete");
             ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
@@ -411,11 +411,121 @@ public class MozartApiK8sDynamicTests {
 
         // Every single job across all buckets must complete successfully
         for (String jobId : allJobIds) {
-            assertTrue(ApiUtils.waitForJobCompletion(baseUri1, jobId, 60, 1000),
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL", 30, 1000),
                     "Job " + jobId + " did not complete");
             ApiUtils.validateJobState(baseUri1, jobId, "SUCCESSFUL");
         }
         System.out.println("All " + allJobIds.size() + " jobs across " + bucketCount + " buckets completed successfully");
+    }
+
+    @Test
+    @Order(9)
+    @Tag("BQ-TC-09")
+    @DisplayName("BQ-TC-09: Validate withMaxParallelJobsPerBucket=2 limits concurrency within a bucket")
+    public void testMaxParallelJobsPerBucket() throws Exception {
+        List<String> podUrls = scaleAndGetPodUrls(1);
+        String baseUri1 = podUrls.get(0);
+
+        assertEquals(200, OrchestratorAPI.startOrchestrator(baseUri1).getStatusCode(),
+                "Orchestrator failed to start");
+
+        // withMaxParallelJobsPerBucket=2 means at most 2 jobs from the same bucket run at once
+        Map<String, Object> config = new HashMap<>();
+        config.put("thread-pool-size", 10);  // large pool so the bucket limit is the bottleneck
+        config.put("withExecuteWithBuckets", true);
+        config.put("withMaxParallelJobsPerBucket", 2);
+        assertEquals(200, ExecutorAPI.configureExecutor(baseUri1, config).getStatusCode(),
+                "Executor failed to configure");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("bucket-name", "bucketA");
+
+        // Submit 6 jobs — if parallelism is correctly capped at 2,
+        // at no point should more than 2 jobs overlap in their start/stop window
+        List<String> jobIds = ApiUtils.submitJobs(baseUri1, 6, "BlankJob", params);
+        assertEquals(6, jobIds.size(), "Job submission count mismatch");
+        System.out.println("Submitted 6 jobs to bucketA with maxParallelJobsPerBucket=2");
+
+        // Wait for all jobs to finish before inspecting timings
+        for (String jobId : jobIds) {
+            assertTrue(ApiUtils.waitForJobState(baseUri1, jobId, "SUCCESSFUL",30, 1000),
+                    "Job " + jobId + " did not complete");
+        }
+
+        // Validate that no more than 2 jobs ran concurrently at any point
+        JobUtils.validateMaxParallelism(baseUri1, jobIds, 2);
+    }
+
+
+    @Test
+    @Order(10)
+    @Tag("BQ-TC-10")
+    @DisplayName("BQ-TC-10: Bucket blocks on job failure, other buckets unaffected, unblock resumes execution")
+    public void testBucketBlocksOnJobFailure() throws Exception {
+        List<String> podUrls = scaleAndGetPodUrls(1);
+        String baseUri1 = podUrls.get(0);
+
+        assertEquals(200, OrchestratorAPI.startOrchestrator(baseUri1).getStatusCode(),
+                "Orchestrator failed to start");
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("thread-pool-size", 10);
+        config.put("withExecuteWithBuckets", true);
+        assertEquals(200, ExecutorAPI.configureExecutor(baseUri1, config).getStatusCode(),
+                "Executor failed to configure");
+
+        // Step 1: Submit a failing job to bucketA — this should cause bucketA to block
+        Map<String, Object> bucketAParams = new HashMap<>();
+        bucketAParams.put("bucket-name", "bucketA");
+
+        List<String> failingJobIds = ApiUtils.submitJobs(baseUri1, 1, "FailOnceJob", bucketAParams);
+        String failingJobId = failingJobIds.get(0);
+        System.out.println("Submitted FailOnceJob to bucketA: " + failingJobId);
+
+        // Step 2: Confirm the failing job reaches FAILED state
+        assertTrue(ApiUtils.waitForJobState(baseUri1, failingJobId, "FAILED", 15, 1000),
+                "FailOnceJob did not reach FAILED state");
+        System.out.println("FailOnceJob " + failingJobId + " confirmed FAILED — bucketA should now be blocked");
+
+        // Step 3: Submit a normal job to the same blocked bucketA
+        // Expectation: it queues but cannot run — stays in READY_TO_RUN
+        List<String> blockedJobIds = ApiUtils.submitJobs(baseUri1, 1, "BlankJob", bucketAParams);
+        String blockedJobId = blockedJobIds.get(0);
+        System.out.println("Submitted BlankJob to blocked bucketA: " + blockedJobId);
+
+        assertTrue(ApiUtils.waitForJobState(baseUri1, blockedJobId, "READY_TO_RUN", 10, 500),
+                "Job in blocked bucketA should be in READY_TO_RUN state but wasn't");
+        System.out.println("Confirmed: job " + blockedJobId + " is stuck in READY_TO_RUN — bucket is blocked");
+
+        // Step 4: Submit a normal job to a different bucket — should be completely unaffected
+        Map<String, Object> bucketBParams = new HashMap<>();
+        bucketBParams.put("bucket-name", "bucketB");
+
+        List<String> unaffectedJobIds = ApiUtils.submitJobs(baseUri1, 1, "BlankJob", bucketBParams);
+        String unaffectedJobId = unaffectedJobIds.get(0);
+        System.out.println("Submitted BlankJob to unaffected bucketB: " + unaffectedJobId);
+
+        assertTrue(ApiUtils.waitForJobState(baseUri1, unaffectedJobId, "SUCCESSFUL", 15, 1000),
+                "Job in bucketB should complete successfully regardless of bucketA being blocked");
+        System.out.println("Confirmed: bucketB job " + unaffectedJobId + " completed — bucket isolation working");
+
+        // Step 5: Unblock the executor — bucketA should resume
+        // Note: unblockExecutor acts globally; if your API supports per-bucket unblocking,
+        // pass bucketA name here instead
+        assertEquals(200, ExecutorAPI.unblockExecutor(baseUri1).getStatusCode(),
+                "Unblock executor call failed");
+        System.out.println("Executor unblocked — bucketA should now resume");
+
+        // Step 6: The previously stuck job should now run to completion
+        assertTrue(ApiUtils.waitForJobState(baseUri1, blockedJobId, "SUCCESSFUL", 15, 1000),
+                "Job " + blockedJobId + " did not complete after bucket was unblocked");
+        System.out.println("Confirmed: previously blocked job " + blockedJobId
+                + " completed successfully after unblock");
+
+        // Step 7: Sanity check — the original failing job's state should still be FAILED
+        assertEquals("FAILED", ApiUtils.getJobState(baseUri1, failingJobId),
+                "FailOnceJob state should remain FAILED after unblock");
+        System.out.println("Confirmed: FailOnceJob " + failingJobId + " state is still FAILED as expected");
     }
 
 }

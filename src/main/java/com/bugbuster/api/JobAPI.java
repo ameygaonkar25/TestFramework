@@ -24,6 +24,7 @@ public class JobAPI {
     public static Response submitTimeConsumingJob(String baseUri, String priority) {
         return given()
                 .baseUri(baseUri)
+                .queryParam("priority", priority)
                 .contentType("application/json")
                 .post("/server-app/testing-integration-app/mozart/jobs/submitTimeConsumingJob")
                 .then()
